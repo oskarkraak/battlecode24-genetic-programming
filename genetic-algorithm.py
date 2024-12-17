@@ -6,6 +6,10 @@ from typing import List, Dict
 
 from template import template
 
+actions = [
+    "if (rc.canBuild([$TRAP1], rc.getLocation().subtract([$DIR1]))) rc.build([$TRAP1], rc.getLocation().subtract([$DIR1]));",
+]
+
 directions = [
     "directions[0]",
     "directions[1]",
@@ -17,8 +21,10 @@ directions = [
     "directions[7]",
 ]
 
-actions = [
-    "if (rc.canBuild(TrapType.EXPLOSIVE, rc.getLocation().subtract([$DIR1]))) rc.build(TrapType.EXPLOSIVE, rc.getLocation().subtract([$DIR1]));",
+trap_type = [
+    "TrapType.EXPLOSIVE",
+    "TrapType.STUN",
+    "TrapType.WATER",
 ]
 
 ifs = [
@@ -37,6 +43,15 @@ ints = [
     "GameConstants.SETUP_ROUNDS",
 ]
 
+mapping = [
+    ("INT", "int", ints),
+    ("ACTION", "action", actions),
+    ("IF", "if", ifs),
+    ("DIR", "direction", directions),
+    ("TRAP", "trap_type", trap_type),
+]
+
+
 class Mutatable:
     def __init__(self, type: str, value: str):
         self.type = type
@@ -44,24 +59,21 @@ class Mutatable:
         self.sub_mutatables: Dict[str, Mutatable] = {}
         self.detect_required_sub_mutatables()
 
-    def detect_required_sub_mutatables(self) -> None:
-        """
-        Detect placeholders like [$INTx] and [$ACTIONx] in the value
-        and map them to specific sub-mutatables.
-        """
-        matches = re.findall(r'\[\$(\w+)\]', self.value)
-        for match in matches:
-            if match not in self.sub_mutatables:
-                if match.startswith("INT"):
-                    self.sub_mutatables[match] = Mutatable("int", random.choice(ints))
-                elif match.startswith("ACTION"):
-                    self.sub_mutatables[match] = Mutatable("action", random.choice(actions))
-                elif match.startswith("DIR"):
-                    self.sub_mutatables[match] = Mutatable("direction", random.choice(directions))
-                elif match.startswith("IF"):
-                    self.sub_mutatables[match] = Mutatable("if", random.choice(ifs))
-                else:
-                    raise RuntimeError(f"Unknown placeholder type: {match}")
+def detect_required_sub_mutatables(self) -> None:
+    """
+    Detect placeholders like [$INTx], [$ACTIONx], etc., in the value
+    and map them dynamically using the 'mapping' list.
+    """
+    matches = re.findall(r'\[\$(\w+)\]', self.value)
+
+    for match in matches:
+        if match not in self.sub_mutatables:  # Ensure no duplicate processing
+            for placeholder, mutatable_type, options in mapping:
+                if match.startswith(placeholder):
+                    self.sub_mutatables[match] = Mutatable(mutatable_type, random.choice(options))
+                    break
+            else:
+                raise RuntimeError(f"Unknown placeholder type: {match}")
 
     def mutate(self):
         """
