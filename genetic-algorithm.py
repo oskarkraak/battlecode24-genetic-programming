@@ -1,35 +1,118 @@
 import random
 import subprocess
+import re
 import os
+from typing import List, Dict
 
-# Define the components of a simple Java program
-template = """
-public class Program {
-    public static int compute(int a, int b) {
-        {code}
-    }
-}
-"""
+from template import template
 
-def generate_random_code():
-    """Generate random Java code that performs simple operations on two integers."""
-    operations = [
-        "return a + b;",
-        "return a - b;",
-        "return a * b;",
-        "return a / b;",
-        "return a % b;",
-        "return Math.max(a, b);",
-        "return Math.min(a, b);"
-    ]
-    return random.choice(operations)
+directions = [
+    "directions[0]",
+    "directions[1]",
+    "directions[2]",
+    "directions[3]",
+    "directions[4]",
+    "directions[5]",
+    "directions[6]",
+    "directions[7]",
+]
+
+actions = [
+    "if (rc.canBuild(TrapType.EXPLOSIVE, rc.getLocation().subtract([$DIR1]))) rc.build(TrapType.EXPLOSIVE, rc.getLocation().subtract([$DIR1]));",
+]
+
+ifs = [
+    "if ([$INT1] > [$INT2]) [$ACTION1]",
+    "if ([$INT1] == [$INT2]) [$ACTION1]",
+    "if ([$INT1] != [$INT2]) [$ACTION1]",
+    "if ([$INT1] > [$INT2]) [$IF1]",
+    "if ([$INT1] == [$INT2]) [$IF1]",
+    "if ([$INT1] != [$INT2]) [$IF1]"
+]
+
+ints = [
+    "rc.getMapHeight()",
+    "rc.getMapWidth()",
+    "rc.getRoundNum()",
+    "GameConstants.SETUP_ROUNDS",
+]
+
+class Mutatable:
+    def __init__(self, type: str, value: str):
+        self.type = type
+        self.value = value
+        self.sub_mutatables: Dict[str, Mutatable] = {}
+        self.detect_required_sub_mutatables()
+
+    def detect_required_sub_mutatables(self) -> None:
+        """
+        Detect placeholders like [$INTx] and [$ACTIONx] in the value
+        and map them to specific sub-mutatables.
+        """
+        matches = re.findall(r'\[\$(\w+)\]', self.value)
+        for match in matches:
+            if match not in self.sub_mutatables:
+                if match.startswith("INT"):
+                    self.sub_mutatables[match] = Mutatable("int", random.choice(ints))
+                elif match.startswith("ACTION"):
+                    self.sub_mutatables[match] = Mutatable("action", random.choice(actions))
+                elif match.startswith("DIR"):
+                    self.sub_mutatables[match] = Mutatable("direction", random.choice(directions))
+                elif match.startswith("IF"):
+                    self.sub_mutatables[match] = Mutatable("if", random.choice(ifs))
+                else:
+                    raise RuntimeError(f"Unknown placeholder type: {match}")
+
+    def mutate(self):
+        """
+        Mutate the sub-mutatables by randomly replacing or mutating them.
+        """
+        for key, sub_mutatable in list(self.sub_mutatables.items()):
+            if random.random() < 0.2:  # 20% chance to replace the sub-mutable
+                if key.startswith("INT"):
+                    self.sub_mutatables[key] = Mutatable("int", random.choice(ints))
+                elif key.startswith("ACTION"):
+                    self.sub_mutatables[key] = Mutatable("action", random.choice(actions))
+                elif key.startswith("DIR"):
+                    self.sub_mutatables[key] = Mutatable("direction", random.choice(directions))
+                elif key.startswith("IF"):
+                    self.sub_mutatables[key] = Mutatable("if", random.choice(ifs))
+            else:
+                sub_mutatable.mutate()  # Recursively mutate existing sub-mutatables
+
+    def __str__(self):
+        result = self.value
+        placeholders = re.findall(r'\[\$(\w+)\]', self.value)
+
+        # Replace all placeholders using the sub-mutatables map
+        for placeholder in placeholders:
+            if placeholder in self.sub_mutatables:
+                result = result.replace(f"[${placeholder}]", str(self.sub_mutatables[placeholder]), 1)
+            else:
+                raise RuntimeError(f"Missing sub-mutable for placeholder: {placeholder}")
+
+        return result
+
+def generate_random_line() -> Mutatable:
+    return Mutatable("action", random.choice(random.choice([actions, ifs])))
+
+def generate_random_code(length=50) -> List[Mutatable]:
+    code = []
+    for i in range(length):
+        code.append(generate_random_line())
+    return code
+
+def code_to_string(code: List[Mutatable]) -> str:
+    """Convert a list of Mutatable objects into a string representation."""
+    return "\n".join(str(mutatable) for mutatable in code)
 
 def fitness(java_code):
     """Evaluate the fitness of the Java code by compiling and running it."""
+
     filename = "Program.java"
     with open(filename, "w") as file:
-        file.write(template.replace("{code}", java_code))
-
+        file.write(template.replace("{code}", code_to_string(java_code)))
+    """
     try:
         # Compile the Java program
         subprocess.run(["javac", filename], check=True)
@@ -56,19 +139,49 @@ def fitness(java_code):
             os.remove(filename)
         if os.path.exists("Program.class"):
             os.remove("Program.class")
+    """
+    return random.random()
 
-def mutate(code):
-    """Mutate the Java code by randomly replacing operations."""
-    return generate_random_code()
+def mutate(code: List[Mutatable]) -> List[Mutatable]:
+    new_code = []
+    for mutatable in code:
+        rand = random.random()
+        if rand < 0.1:  # 10% chance to delete the line
+            continue
+        elif rand < 0.2:  # 10% chance to add a line
+            new_code.append(mutatable)
+            new_code.append(generate_random_line())
+        elif rand < 0.4:  # 20% chance to mutate the line
+            mutatable.mutate()
+            new_code.append(mutatable)
+        else:
+            new_code.append(mutatable)
+    return new_code
 
-def crossover(code1, code2):
-    """Crossover two Java codes (not meaningful in this simple case)."""
-    return random.choice([code1, code2])
+def crossover(code1: List[Mutatable], code2: List[Mutatable]) -> List[Mutatable]:
+    """
+    Perform uniform crossover with handling for differing code lengths.
+    Each line has a 50% chance of being taken from either parent, with optional truncation or extension.
+    """
+    offspring = []
+    max_len = min(len(code1), len(code2))  # Allow crossover up to the length of the shorter program
+
+    # Mix lines probabilistically
+    for i in range(max_len):
+        offspring.append(random.choice([code1[i], code2[i]]))
+
+    # Randomly add extra lines from the longer parent
+    longer_parent = code1 if len(code1) > len(code2) else code2
+    for i in range(max_len, len(longer_parent)):
+        if random.random() < 0.5:  # 50% chance to include remaining lines
+            offspring.append(longer_parent[i])
+
+    return offspring
 
 def genetic_programming():
     """Main loop for genetic programming."""
     population = [generate_random_code() for _ in range(10)]
-    generations = 50
+    generations = 1 #50
 
     for generation in range(generations):
         # Evaluate fitness of the population
@@ -98,4 +211,4 @@ def genetic_programming():
 if __name__ == "__main__":
     best_code = genetic_programming()
     print("Best Java Program:")
-    print(template.replace("{code}", best_code))
+    print(template.replace("{code}", code_to_string(best_code)))
