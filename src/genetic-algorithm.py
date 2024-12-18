@@ -3,53 +3,11 @@ import subprocess
 import re
 import os
 from typing import List, Dict
+import platform
+import time
 
 from template import template
-
-actions = [
-    "if (rc.canBuild([$TRAP1], rc.getLocation().subtract([$DIR1]))) rc.build([$TRAP1], rc.getLocation().subtract([$DIR1]));",
-]
-
-directions = [
-    "directions[0]",
-    "directions[1]",
-    "directions[2]",
-    "directions[3]",
-    "directions[4]",
-    "directions[5]",
-    "directions[6]",
-    "directions[7]",
-]
-
-trap_type = [
-    "TrapType.EXPLOSIVE",
-    "TrapType.STUN",
-    "TrapType.WATER",
-]
-
-ifs = [
-    "if ([$INT1] > [$INT2]) [$ACTION1]",
-    "if ([$INT1] == [$INT2]) [$ACTION1]",
-    "if ([$INT1] != [$INT2]) [$ACTION1]",
-    "if ([$INT1] > [$INT2]) [$IF1]",
-    "if ([$INT1] == [$INT2]) [$IF1]",
-    "if ([$INT1] != [$INT2]) [$IF1]"
-]
-
-ints = [
-    "rc.getMapHeight()",
-    "rc.getMapWidth()",
-    "rc.getRoundNum()",
-    "GameConstants.SETUP_ROUNDS",
-]
-
-mapping = [
-    ("INT", "int", ints),
-    ("ACTION", "action", actions),
-    ("IF", "if", ifs),
-    ("DIR", "direction", directions),
-    ("TRAP", "trap_type", trap_type),
-]
+from mutatable_strings import *
 
 
 class Mutatable:
@@ -59,21 +17,21 @@ class Mutatable:
         self.sub_mutatables: Dict[str, Mutatable] = {}
         self.detect_required_sub_mutatables()
 
-def detect_required_sub_mutatables(self) -> None:
-    """
-    Detect placeholders like [$INTx], [$ACTIONx], etc., in the value
-    and map them dynamically using the 'mapping' list.
-    """
-    matches = re.findall(r'\[\$(\w+)\]', self.value)
+    def detect_required_sub_mutatables(self) -> None:
+        """
+        Detect placeholders like [$INTx], [$ACTIONx], etc., in the value
+        and map them dynamically using the 'mapping' list.
+        """
+        matches = re.findall(r'\[\$(\w+)\]', self.value)
 
-    for match in matches:
-        if match not in self.sub_mutatables:  # Ensure no duplicate processing
-            for placeholder, mutatable_type, options in mapping:
-                if match.startswith(placeholder):
-                    self.sub_mutatables[match] = Mutatable(mutatable_type, random.choice(options))
-                    break
-            else:
-                raise RuntimeError(f"Unknown placeholder type: {match}")
+        for match in matches:
+            if match not in self.sub_mutatables:  # Ensure no duplicate processing
+                for placeholder, mutatable_type, options in mapping:
+                    if match.startswith(placeholder):
+                        self.sub_mutatables[match] = Mutatable(mutatable_type, random.choice(options))
+                        break
+                else:
+                    raise RuntimeError(f"Unknown placeholder type: {match}")
 
     def mutate(self):
         """
@@ -118,41 +76,81 @@ def code_to_string(code: List[Mutatable]) -> str:
     """Convert a list of Mutatable objects into a string representation."""
     return "\n".join(str(mutatable) for mutatable in code)
 
-def fitness(java_code):
-    """Evaluate the fitness of the Java code by compiling and running it."""
-
-    filename = "Program.java"
-    with open(filename, "w") as file:
-        file.write(template.replace("{code}", code_to_string(java_code)))
+def analyze_output(output: str) -> float:
     """
+    Analyze the output of the program to determine if team A won.
+    Fitness is 1 if 'A' wins, otherwise 0.
+    """
+    # Check for match result
+    if "(A) wins" in output:
+        return 1.0
+    else:
+        return 0.0
+
+def timestamp() -> str:
+    """Return the current time as a formatted string."""
+    return time.strftime("[%Y-%m-%d %H:%M:%S]")
+
+def fitness(java_code: List[Mutatable]) -> float:
+    """
+    Evaluate the fitness of the Java code by writing it to the Battlecode scaffold,
+    running it via Gradle, and analyzing the output.
+    Fitness = 1 if team A wins, otherwise 0.
+    """
+    # Paths
+    battlecode_path = os.path.abspath("./battlecode24-scaffold/src/genalgplayer/")
+    java_file_path = os.path.join(battlecode_path, "RobotPlayer.java")
+    gradle_path = os.path.abspath("./battlecode24-scaffold/")
+    gradle_executable = os.path.join(gradle_path, "gradlew.bat" if platform.system() == "Windows" else "gradlew")
+
     try:
-        # Compile the Java program
-        subprocess.run(["javac", filename], check=True)
-        # Run the compiled program with test inputs
-        results = []
-        for a, b in [(1, 2), (3, 5), (-1, -3), (10, 5)]:
-            result = subprocess.run(["java", "-cp", ".", "Program"],
-                                    input=f"{a}\n{b}\n".encode(),
-                                    capture_output=True, check=True)
-            results.append(int(result.stdout.strip()))
+        # Ensure paths exist
+        os.makedirs(battlecode_path, exist_ok=True)
+        if not os.path.exists(gradle_executable):
+            raise FileNotFoundError(f"Gradle wrapper not found at '{gradle_executable}'")
 
-        # Target behavior: summing two numbers
-        target = [a + b for a, b in [(1, 2), (3, 5), (-1, -3), (10, 5)]]
-        score = -sum(abs(r - t) for r, t in zip(results, target))
-        return score
+        # Write the generated Java code
+        generated_code = template.replace("{code}", code_to_string(java_code))
+        #print("Generated Java Code:\n", generated_code)  # Debug
+        with open(java_file_path, "w") as file:
+            file.write(generated_code)
+            file.flush()
 
+        print(f"{timestamp()} Generated code written to {java_file_path}")
+        print(f"{timestamp()} Starting gradle run...")
+
+        # Run the Gradle 'run' task
+        result = subprocess.run(
+            [gradle_executable, "run", "--quiet"],
+            cwd=gradle_path,
+            capture_output=True,
+            text=True,
+            timeout=300
+        )
+
+        print(f"{timestamp()} Finished gradle run.")
+
+        # Check if Gradle succeeded
+        if result.returncode != 0:
+            print(f"{timestamp()} Gradle build failed. Return code: {result.returncode}")
+            print(f"{timestamp()} Error Output:\n{result.stderr}")
+            return 0  # Penalize failures
+
+        # Analyze the output for a win
+        output = result.stdout.strip()
+        result = analyze_output(output)
+        print(f"{timestamp()} Program output: {result}")
+        return result
+
+    except subprocess.TimeoutExpired:
+        print(f"{timestamp()} Gradle run task timed out.")
+        return 0  # Penalize timeouts
     except Exception as e:
-        # Penalize code that doesn't compile or run correctly
-        return -float('inf')
-
+        print(f"{timestamp()} Error during fitness evaluation: {e}")
+        return 0  # Penalize any other issues
     finally:
-        # Clean up
-        if os.path.exists(filename):
-            os.remove(filename)
-        if os.path.exists("Program.class"):
-            os.remove("Program.class")
-    """
-    return random.random()
+        pass
+
 
 def mutate(code: List[Mutatable]) -> List[Mutatable]:
     new_code = []
@@ -192,13 +190,16 @@ def crossover(code1: List[Mutatable], code2: List[Mutatable]) -> List[Mutatable]
 
 def genetic_programming():
     """Main loop for genetic programming."""
-    population = [generate_random_code() for _ in range(10)]
-    generations = 1 #50
+    population_size = 1
+    generations = 1
+
+    population = [generate_random_code() for _ in range(population_size)]
 
     for generation in range(generations):
         # Evaluate fitness of the population
         scores = [(fitness(code), code) for code in population]
-        scores.sort(reverse=True)
+        # Sort the scores explicitly by the fitness value (first element of the tuple)
+        scores.sort(key=lambda x: x[0], reverse=True)
 
         # Print the best score of the generation
         print(f"Generation {generation}: Best Score: {scores[0][0]}")
@@ -222,5 +223,4 @@ def genetic_programming():
 
 if __name__ == "__main__":
     best_code = genetic_programming()
-    print("Best Java Program:")
-    print(template.replace("{code}", code_to_string(best_code)))
+    print("done :)")

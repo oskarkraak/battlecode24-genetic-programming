@@ -1,5 +1,5 @@
 template = """
-package examplefuncsplayer;
+package genalgplayer;
 
 import battlecode.common.*;
 
