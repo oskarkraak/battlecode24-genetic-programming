@@ -1,9 +1,11 @@
 import random
-from typing import List
+from typing import List, Tuple
 
+from src.bot_names import get_names
 from src.mutatable import Mutatable
 from src.mutatable_strings import actions, ifs
-from src.battlecode_runner import run_battlecode
+from src.battlecode_runner import make_bot
+from src.tournament import run_one_game_tournament
 
 
 def generate_random_line() -> Mutatable:
@@ -15,13 +17,30 @@ def generate_random_code(length=50) -> List[Mutatable]:
         code.append(generate_random_line())
     return code
 
-def fitness(java_code: List[Mutatable]) -> int:
+def fitness(java_codes: List[List[Mutatable]], generation: int) -> List[Tuple[int, List[Mutatable], str]]:
     """
-    Evaluate the fitness of the Java code by writing it to the Battlecode scaffold,
-    running it via Gradle, and analyzing the output.
-    Fitness = 1 if team A wins, otherwise 0.
+    Evaluate the fitness of Java bots using a double-elimination tournament.
+    Bots are ranked based on their performance.
     """
-    return run_battlecode(java_code)
+
+    # Create bots/files
+    result = []
+    names = get_names(len(java_codes))
+    for i, java_code in enumerate(java_codes):
+        name = names[i]
+        make_bot(generation, name, java_code)
+        result.append((0, java_code, name))  # Initialize rank as 0
+
+    # Run the double-elimination tournament
+    rankings = run_one_game_tournament(generation, names)
+
+    # Update results with final ranks
+    ranked_result = [
+        (rank, java_codes[names.index(bot_name)], bot_name)
+        for rank, bot_name in enumerate(rankings, start=1)
+    ]
+
+    return ranked_result
 
 def mutate(code: List[Mutatable]) -> List[Mutatable]:
     new_code = []
@@ -61,26 +80,28 @@ def crossover(code1: List[Mutatable], code2: List[Mutatable]) -> List[Mutatable]
 
 def genetic_programming():
     """Main loop for genetic programming."""
-    population_size = 1
-    generations = 1
+    initial_population_size = 4
+    population_size = 4
+    generations = 2
 
-    population = [generate_random_code() for _ in range(population_size)]
+    population = [generate_random_code() for _ in range(initial_population_size)]
 
     for generation in range(generations):
         # Evaluate fitness of the population
-        scores = [(fitness(code), code) for code in population]
+        scores = fitness(population, generation)
         # Sort the scores explicitly by the fitness value (first element of the tuple)
-        scores.sort(key=lambda x: x[0], reverse=True)
+        scores.sort(key=lambda x: x[0])  # Sort by rank (ascending)
 
         # Print the best score of the generation
         print(f"Generation {generation}: Best Score: {scores[0][0]}")
 
         # Select the top individuals
-        top_individuals = [code for _, code in scores[:5]]
+        number_of_top_individuals = int(len(population)/2)
+        top_individuals = [code for _, code, _ in scores[:number_of_top_individuals]]
 
         # Create the next generation
         next_generation = top_individuals[:]
-        while len(next_generation) < 10:
+        while len(next_generation) < population_size:
             if random.random() < 0.5:  # Mutation
                 next_generation.append(mutate(random.choice(top_individuals)))
             else:  # Crossover

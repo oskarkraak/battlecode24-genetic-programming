@@ -1,5 +1,5 @@
 template = """
-package genalgplayer;
+package [$PACKAGE];
 
 import battlecode.common.*;
 
@@ -78,7 +78,7 @@ public strictfp class RobotPlayer {
                         if (rc.canMove(dir)) rc.move(dir);
                     }
 
-{code}
+[$CODE]
 
                 }
 
