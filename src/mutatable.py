@@ -21,12 +21,7 @@ class Mutatable:
 
         for match in matches:
             if match not in self.sub_mutatables:  # Ensure no duplicate processing
-                for placeholder, mutatable_type, options in mapping:
-                    if match.startswith(placeholder):
-                        self.sub_mutatables[match] = Mutatable(mutatable_type, random.choice(options))
-                        break
-                else:
-                    raise RuntimeError(f"Unknown placeholder type: {match}")
+                self.set_sub_mutatable(match)
 
     def mutate(self):
         """
@@ -34,16 +29,17 @@ class Mutatable:
         """
         for key, sub_mutatable in list(self.sub_mutatables.items()):
             if random.random() < 0.2:  # 20% chance to replace the sub-mutable
-                if key.startswith("INT"):
-                    self.sub_mutatables[key] = Mutatable("int", random.choice(ints))
-                elif key.startswith("ACTION"):
-                    self.sub_mutatables[key] = Mutatable("action", random.choice(actions))
-                elif key.startswith("DIR"):
-                    self.sub_mutatables[key] = Mutatable("direction", random.choice(directions))
-                elif key.startswith("IF"):
-                    self.sub_mutatables[key] = Mutatable("if", random.choice(ifs))
+                self.set_sub_mutatable(key)
             else:
                 sub_mutatable.mutate()  # Recursively mutate existing sub-mutatables
+
+    def set_sub_mutatable(self, key: str):
+        for placeholder, mutatable_type, options in mapping:
+            if key.startswith(placeholder):
+                self.sub_mutatables[key] = Mutatable(mutatable_type, random.choice(options))
+                break
+        else:
+            raise RuntimeError(f"Unknown placeholder type: {key}")
 
     def __str__(self):
         result = self.value

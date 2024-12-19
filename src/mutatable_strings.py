@@ -2,6 +2,15 @@ actions = [
     "if (rc.canBuild([$TRAP1], rc.getLocation().subtract([$DIR1]))) rc.build([$TRAP1], rc.getLocation().subtract([$DIR1]));",
 ]
 
+ifs = [
+    "if ([$INT1] > [$INT2]) [$ACTION1]",
+    "if ([$INT1] == [$INT2]) [$ACTION1]",
+    "if ([$INT1] != [$INT2]) [$ACTION1]",
+    "if ([$INT1] > [$INT2]) [$IF1]",
+    "if ([$INT1] == [$INT2]) [$IF1]",
+    "if ([$INT1] != [$INT2]) [$IF1]"
+]
+
 directions = [
     "directions[0]",
     "directions[1]",
@@ -17,15 +26,6 @@ trap_types = [
     "TrapType.EXPLOSIVE",
     "TrapType.STUN",
     "TrapType.WATER",
-]
-
-ifs = [
-    "if ([$INT1] > [$INT2]) [$ACTION1]",
-    "if ([$INT1] == [$INT2]) [$ACTION1]",
-    "if ([$INT1] != [$INT2]) [$ACTION1]",
-    "if ([$INT1] > [$INT2]) [$IF1]",
-    "if ([$INT1] == [$INT2]) [$IF1]",
-    "if ([$INT1] != [$INT2]) [$IF1]"
 ]
 
 ints = [
