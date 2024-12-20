@@ -14,6 +14,11 @@ def analyze_output(output: str) -> int:
     Fitness is 1 if 'A' wins, otherwise 0.
     """
     # Check for match result
+    if output == 0:
+        raise RuntimeError("Build failed")
+    if "Couldn't load player class" in output:
+        raise RuntimeError("Player not loaded", output)
+
     if "(A) wins" in output:
         return 1
     else:

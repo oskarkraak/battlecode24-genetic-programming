@@ -13,7 +13,7 @@ gradle_path = os.path.abspath("../battlecode24-scaffold/")
 gradle_executable = os.path.join(gradle_path, "gradlew.bat" if platform.system() == "Windows" else "gradlew")
 
 
-def make_bot(gen: int, bot_name: str, java_code: List[Mutatable]) -> str:
+def make_bot(bot_name: str, java_code: List[Mutatable]) -> None:
     """
     Writes the bot into a file.
 
@@ -23,22 +23,19 @@ def make_bot(gen: int, bot_name: str, java_code: List[Mutatable]) -> str:
     :return: string containing the ID of the bot for execution
     """
     # Create folder
-    gen = "gen" + str(gen)
-    id = gen + "." + bot_name
     if not os.path.exists(gradle_executable):
         raise NotADirectoryError(f"Battlecode source not found at '{battlecode_path}'")
+    gen, bot_name_without_gen = bot_name.split(".")
     package_path = os.path.join(battlecode_path, gen)
-    package_path = os.path.join(package_path, bot_name)
+    package_path = os.path.join(package_path, bot_name_without_gen)
     os.makedirs(package_path, exist_ok=True)
     java_file_path = os.path.join(package_path, "RobotPlayer.java")
     # Write the generated Java code
-    generated_code = template.replace("[$CODE]", code_to_string(java_code)).replace("[$PACKAGE]", id)
+    generated_code = template.replace("[$CODE]", code_to_string(java_code)).replace("[$PACKAGE]", bot_name)
     with open(java_file_path, "w") as file:
         file.write(generated_code)
         file.flush()
     print(f"{timestamp()} Generated code written to {java_file_path}")
-
-    return id
 
 
 def execute_gradle_task(name: str, args: List[str] = []) -> str:
@@ -88,5 +85,4 @@ def run_battlecode(bot1_name: str, bot2_name: str) -> int:
     """
     output = execute_gradle_task("runWithoutBuild", [f"-PteamA={bot1_name}", f"-PteamB={bot2_name}"])
     result = analyze_output(output)
-    print(f"{timestamp()} Program output: {result}")
     return result

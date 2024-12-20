@@ -26,14 +26,16 @@ def fitness(java_codes: List[List[Mutatable]], generation: int) -> List[Tuple[in
     # Create bots/files
     result = []
     names = get_names(len(java_codes))
+    for i in range(len(names)):
+        names[i] = "gen" + str(generation) + "." + names[i]
     for i, java_code in enumerate(java_codes):
         name = names[i]
-        make_bot(generation, name, java_code)
+        make_bot(name, java_code)
         result.append((0, java_code, name))  # Initialize rank as 0
     build_bots()
 
     # Run the double-elimination tournament
-    rankings = run_one_game_tournament(generation, names)
+    rankings = run_one_game_tournament(names)
 
     # Update results with final ranks
     ranked_result = [
@@ -81,9 +83,9 @@ def crossover(code1: List[Mutatable], code2: List[Mutatable]) -> List[Mutatable]
 
 def genetic_programming():
     """Main loop for genetic programming."""
-    initial_population_size = 6
+    initial_population_size = 10
     population_size = 6
-    generations = 2
+    generations = 4
 
     population = [generate_random_code() for _ in range(initial_population_size)]
 

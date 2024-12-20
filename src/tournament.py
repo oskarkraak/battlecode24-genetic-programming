@@ -3,6 +3,7 @@ from typing import List, Tuple
 
 from src.battlecode_runner import run_battlecode
 from src.util import timestamp
+from concurrent.futures import ThreadPoolExecutor
 
 
 def run_battle(bot1: str, bot2: str) -> Tuple[str, str]:
@@ -15,8 +16,10 @@ def run_battle(bot1: str, bot2: str) -> Tuple[str, str]:
 
     # Determine winner based on battle results
     if result == 1:
+        print(f"{timestamp()} Battle finished: {bot1} won vs {bot2}")
         return bot1, bot2
     else:
+        print(f"{timestamp()} Battle finished: {bot2} won vs {bot1}")
         return bot2, bot1
 
 def run_double_elimination_tournament(names: List[str]) -> List[str]:
@@ -71,20 +74,20 @@ def run_double_elimination_tournament(names: List[str]) -> List[str]:
 
     return eliminated[::-1]  # Return rankings in reverse order (winner last)
 
-def run_one_game_tournament(generation: int, names: List[str]) -> List[str]:
+def run_one_game_tournament(names: List[str]) -> List[str]:
     """
     Returns the winners in the first half of the list and the losers in the second half.
     Can't handle uneven number of names.
     """
     winners = []
     losers = []
-    gen: str = "gen" + str(generation) + "."
-    for i in range(0, len(names), 2):
-        result = run_battle(gen + names[i], gen + names[i+1])
-        if result == 1:
-            winners.append(names[i])
-            losers.append(names[i+1])
-        else:
-            winners.append(names[i+1])
-            losers.append(names[i])
+    pairs = [(names[i], names[i+1]) for i in range(0, len(names), 2)]
+
+    with ThreadPoolExecutor() as executor:
+        results = list(executor.map(lambda pair: run_battle(*pair), pairs))
+
+    for winner, loser in results:
+        winners.append(winner)
+        losers.append(loser)
+
     return winners + losers
