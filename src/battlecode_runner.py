@@ -53,7 +53,7 @@ def execute_gradle_task(name: str, args: List[str] = []) -> str:
             cwd=gradle_path,
             capture_output=True,
             text=True,
-            timeout=300
+            timeout=150
         )
 
         print(f"{timestamp()} Finished gradle {name}.")

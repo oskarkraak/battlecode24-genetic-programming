@@ -11,39 +11,13 @@ from src.tournament import run_one_game_tournament
 def generate_random_line() -> Mutatable:
     return Mutatable("action", random.choice(random.choice([actions, ifs])))
 
+
 def generate_random_code(length=50) -> List[Mutatable]:
     code = []
     for i in range(length):
         code.append(generate_random_line())
     return code
 
-def fitness(java_codes: List[List[Mutatable]], generation: int) -> List[Tuple[int, List[Mutatable], str]]:
-    """
-    Evaluate the fitness of Java bots using a double-elimination tournament.
-    Bots are ranked based on their performance.
-    """
-
-    # Create bots/files
-    result = []
-    names = get_names(len(java_codes))
-    for i in range(len(names)):
-        names[i] = "gen" + str(generation) + "." + names[i]
-    for i, java_code in enumerate(java_codes):
-        name = names[i]
-        make_bot(name, java_code)
-        result.append((0, java_code, name))  # Initialize rank as 0
-    build_bots()
-
-    # Run the double-elimination tournament
-    rankings = run_one_game_tournament(names)
-
-    # Update results with final ranks
-    ranked_result = [
-        (rank, java_codes[names.index(bot_name)], bot_name)
-        for rank, bot_name in enumerate(rankings, start=1)
-    ]
-
-    return ranked_result
 
 def mutate(code: List[Mutatable]) -> List[Mutatable]:
     new_code = []
@@ -60,6 +34,7 @@ def mutate(code: List[Mutatable]) -> List[Mutatable]:
         else:
             new_code.append(mutatable)
     return new_code
+
 
 def crossover(code1: List[Mutatable], code2: List[Mutatable]) -> List[Mutatable]:
     """
@@ -81,13 +56,42 @@ def crossover(code1: List[Mutatable], code2: List[Mutatable]) -> List[Mutatable]
 
     return offspring
 
+
+def fitness(java_codes: List[Tuple[str, List[Mutatable]]], generation: int) -> List[Tuple[int, List[Mutatable], str]]:
+    """
+    Evaluate the fitness of Java bots using a tournament.
+    Bots are ranked based on their performance.
+    """
+    # Create bots/files
+    result = []
+    names = [name for name, _ in java_codes]
+    for name, java_code in java_codes:
+        make_bot(name, java_code)
+        result.append((0, java_code, name))  # Initialize rank as 0
+    build_bots()
+
+    # Run the tournament
+    rankings = run_one_game_tournament(names)
+
+    # Update results with final ranks
+    ranked_result = [
+        (rank, java_codes[names.index(bot_name)][1], bot_name)
+        for rank, bot_name in enumerate(rankings, start=1)
+    ]
+
+    return ranked_result
+
+
 def genetic_programming():
     """Main loop for genetic programming."""
     initial_population_size = 10
     population_size = 6
     generations = 4
 
-    population = [generate_random_code() for _ in range(initial_population_size)]
+    names = get_names(initial_population_size)
+    for i in range(len(names)):
+        names[i] = "gen0." + names[i]
+    population = [(names[i], generate_random_code()) for i in range(initial_population_size)]
 
     for generation in range(generations):
         # Evaluate fitness of the population
@@ -99,20 +103,30 @@ def genetic_programming():
         print(f"Generation {generation}: Best Score: {scores[0][0]}")
 
         # Select the top individuals
-        number_of_top_individuals = int(len(population)/2)
-        top_individuals = [code for _, code, _ in scores[:number_of_top_individuals]]
+        number_of_top_individuals = int(population_size / 2)
+        top_individuals = scores[:number_of_top_individuals]
 
         # Create the next generation
-        next_generation = top_individuals[:]
-        while len(next_generation) < population_size:
+        next_generation = []
+        next_generation.extend((name.replace("gen" + str(generation), "gen" + str(generation+1)), code) for _, code, name in top_individuals)  # Preserve top individuals
+
+        # Generate offspring for the remaining slots
+        offspring = []
+        while len(next_generation) + len(offspring) < population_size:
             if random.random() < 0.5:  # Mutation
-                next_generation.append(mutate(random.choice(top_individuals)))
+                _, code, _ = random.choice(top_individuals)
+                offspring.append(mutate(code))
             else:  # Crossover
-                next_generation.append(crossover(random.choice(top_individuals),
-                                                 random.choice(top_individuals)))
+                _, code1, _ = random.choice(top_individuals)
+                _, code2, _ = random.choice(top_individuals)
+                offspring.append(crossover(code1, code2))
+        offspring_names = get_names(len(offspring))
+        for i in range(len(offspring_names)):
+            offspring_names[i] = "gen" + str(generation+1) + "." + offspring_names[i]
+        for i in range(len(offspring)):
+            next_generation.append((offspring_names[i], offspring[i]));
 
         population = next_generation
 
     # Return the best program
     return scores[0][1]
-
