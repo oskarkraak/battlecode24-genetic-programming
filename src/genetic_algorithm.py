@@ -4,7 +4,7 @@ from typing import List, Tuple
 from src.bot_names import get_names
 from src.mutatable import Mutatable
 from src.mutatable_strings import actions, ifs
-from src.battlecode_runner import make_bot
+from src.battlecode_runner import make_bot, build_bots
 from src.tournament import run_one_game_tournament
 
 
@@ -30,6 +30,7 @@ def fitness(java_codes: List[List[Mutatable]], generation: int) -> List[Tuple[in
         name = names[i]
         make_bot(generation, name, java_code)
         result.append((0, java_code, name))  # Initialize rank as 0
+    build_bots()
 
     # Run the double-elimination tournament
     rankings = run_one_game_tournament(generation, names)
@@ -80,8 +81,8 @@ def crossover(code1: List[Mutatable], code2: List[Mutatable]) -> List[Mutatable]
 
 def genetic_programming():
     """Main loop for genetic programming."""
-    initial_population_size = 4
-    population_size = 4
+    initial_population_size = 6
+    population_size = 6
     generations = 2
 
     population = [generate_random_code() for _ in range(initial_population_size)]

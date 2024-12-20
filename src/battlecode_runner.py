@@ -41,43 +41,52 @@ def make_bot(gen: int, bot_name: str, java_code: List[Mutatable]) -> str:
     return id
 
 
-def run_battlecode(bot1_name: str, bot2_name: str) -> int:
-    """
-    :return:
-    """
+def execute_gradle_task(name: str, args: List[str] = []) -> str:
     try:
         # Ensure gradle paths exist
         if not os.path.exists(gradle_executable):
             raise FileNotFoundError(f"Gradle wrapper not found at '{gradle_executable}'")
 
-        print(f"{timestamp()} Starting gradle run...")
+        print(f"{timestamp()} Starting gradle {name}...")
 
-        # Run the Gradle 'run' task
+        args: List[str] = [gradle_executable, name] + args + ["--quiet"]
+        # Run the Gradle task
         result = subprocess.run(
-            [gradle_executable, "run", f"-PteamA={bot1_name}", f"-PteamB={bot2_name}", "--quiet"],
+            args,
             cwd=gradle_path,
             capture_output=True,
             text=True,
             timeout=300
         )
 
-        print(f"{timestamp()} Finished gradle run.")
+        print(f"{timestamp()} Finished gradle {name}.")
 
         # Check if Gradle succeeded
         if result.returncode != 0:
-            print(f"{timestamp()} Gradle build failed. Return code: {result.returncode}")
+            print(f"{timestamp()} Gradle {name} failed. Return code: {result.returncode}")
             print(f"{timestamp()} Error Output:\n{result.stderr}")
             return 0  # Penalize failures - would make sense if this was the fitness function, but doesn't
 
-        # Analyze the output for a win
         output = result.stdout.strip()
-        result = analyze_output(output)
-        print(f"{timestamp()} Program output: {result}")
-        return result
+        return output
 
     except subprocess.TimeoutExpired:
-        print(f"{timestamp()} Gradle run task timed out.")
+        print(f"{timestamp()} Gradle {name} task timed out.")
         return 0  # Penalize timeouts
     except Exception as e:
-        print(f"{timestamp()} Error during fitness evaluation: {e}")
+        print(f"{timestamp()} Error during Gradle {name}: {e}")
         return 0  # Penalize any other issues
+
+
+def build_bots():
+    execute_gradle_task("build")
+
+
+def run_battlecode(bot1_name: str, bot2_name: str) -> int:
+    """
+    :return:
+    """
+    output = execute_gradle_task("runWithoutBuild", [f"-PteamA={bot1_name}", f"-PteamB={bot2_name}"])
+    result = analyze_output(output)
+    print(f"{timestamp()} Program output: {result}")
+    return result
