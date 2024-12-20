@@ -86,8 +86,8 @@ def fitness(java_codes: List[Tuple[str, List[Mutatable]]], generation: int) -> L
 def genetic_programming():
     """Main loop for genetic programming."""
     initial_population_size = 10
-    population_size = 6
-    generations = 2
+    population_size = 10
+    generations = 1
 
     names = get_names(initial_population_size)
     for i in range(len(names)):
@@ -138,7 +138,7 @@ def genetic_programming():
     scores.sort(key=lambda x: x[0])  # Sort by rank (ascending)
 
     # Extract the names of the top bots for the double-elimination tournament
-    final_bot_names = [name for _, _, name in scores[:population_size/2]]
+    final_bot_names = [name for _, _, name in scores[:int(population_size/2)]]
 
     # Run the double-elimination tournament and print the top 3 winners
     print(f"{timestamp()} let's do a final double elimination tournament!")
@@ -147,5 +147,3 @@ def genetic_programming():
     print(f"\n{timestamp()} Final Top 3 Winners:")
     for rank, bot in enumerate(final_rankings[:3], start=1):
         print(f"Rank {rank}: {bot}")
-
-    print(f"{timestamp()} done :)")
