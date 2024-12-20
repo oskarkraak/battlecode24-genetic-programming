@@ -77,6 +77,8 @@ public strictfp class RobotPlayer {
                         Direction dir = rc.getLocation().directionTo(firstLoc);
                         if (rc.canMove(dir)) rc.move(dir);
                     }
+                    
+                    RobotInfo[] nearbyRobots = rc.senseNearbyRobots(4);
 
 [$CODE]
 
@@ -105,6 +107,17 @@ public strictfp class RobotPlayer {
 
         // Your code should never reach here (unless it's intentional)! Self-destruction imminent...
     }
+    
+    public static void tryPickupFlag(RobotController rc) throws GameActionException{
+        FlagInfo[] flags = rc.senseNearbyFlags(2, rc.getTeam().opponent());
+        for (FlagInfo flag : flags) {
+            if (!flag.isPickedUp()){
+                rc.pickupFlag(flag.getLocation());
+                return;
+            }
+        }
+    }
+    
 }
 
 """
