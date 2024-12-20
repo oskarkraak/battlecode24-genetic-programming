@@ -5,7 +5,8 @@ from src.bot_names import get_names
 from src.mutatable import Mutatable
 from src.mutatable_strings import actions, ifs
 from src.battlecode_runner import make_bot, build_bots
-from src.tournament import run_one_game_tournament
+from src.tournament import run_one_game_tournament, run_double_elimination_tournament
+from src.util import timestamp
 
 
 def generate_random_line() -> Mutatable:
@@ -86,7 +87,7 @@ def genetic_programming():
     """Main loop for genetic programming."""
     initial_population_size = 10
     population_size = 6
-    generations = 4
+    generations = 2
 
     names = get_names(initial_population_size)
     for i in range(len(names)):
@@ -108,7 +109,10 @@ def genetic_programming():
 
         # Create the next generation
         next_generation = []
-        next_generation.extend((name.replace("gen" + str(generation), "gen" + str(generation+1)), code) for _, code, name in top_individuals)  # Preserve top individuals
+        next_generation.extend(
+            (name.replace("gen" + str(generation), "gen" + str(generation+1)), code)
+            for _, code, name in top_individuals
+        )  # Preserve top individuals
 
         # Generate offspring for the remaining slots
         offspring = []
@@ -124,9 +128,24 @@ def genetic_programming():
         for i in range(len(offspring_names)):
             offspring_names[i] = "gen" + str(generation+1) + "." + offspring_names[i]
         for i in range(len(offspring)):
-            next_generation.append((offspring_names[i], offspring[i]));
+            next_generation.append((offspring_names[i], offspring[i]))
 
         population = next_generation
 
-    # Return the best program
-    return scores[0][1]
+    # Evaluate fitness of the final population
+    scores = fitness(population, generations)
+    # Sort the scores explicitly by the fitness value (first element of the tuple)
+    scores.sort(key=lambda x: x[0])  # Sort by rank (ascending)
+
+    # Extract the names of the top bots for the double-elimination tournament
+    final_bot_names = [name for _, _, name in scores[:population_size/2]]
+
+    # Run the double-elimination tournament and print the top 3 winners
+    print(f"{timestamp()} let's do a final double elimination tournament!")
+    final_rankings = run_double_elimination_tournament(final_bot_names)
+
+    print(f"\n{timestamp()} Final Top 3 Winners:")
+    for rank, bot in enumerate(final_rankings[:3], start=1):
+        print(f"Rank {rank}: {bot}")
+
+    print(f"{timestamp()} done :)")

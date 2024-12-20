@@ -72,7 +72,8 @@ def run_double_elimination_tournament(names: List[str]) -> List[str]:
         eliminated.append(loser)
         eliminated.append(winner)  # Add the final winner last
 
-    return eliminated[::-1]  # Return rankings in reverse order (winner last)
+    eliminated.reverse()
+    return eliminated
 
 def run_one_game_tournament(names: List[str]) -> List[str]:
     """
