@@ -17,7 +17,7 @@ import java.util.Set;
  */
 public strictfp class RobotPlayer {
 
-    static final Random rng = new Random(6147);
+    static final Random rng = new Random();
 
     /** Array containing all the possible movement directions. */
     static final Direction[] directions = {
