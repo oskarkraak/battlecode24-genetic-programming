@@ -2,7 +2,7 @@ import random
 import re
 from typing import Dict
 
-from mutatable_strings import *
+from src.mutatable_strings import *
 
 
 class Mutatable:
