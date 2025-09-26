@@ -46,14 +46,14 @@ def execute_gradle_task(name: str, args: List[str] = []) -> str:
 
         print(f"{timestamp()} Starting gradle {name}...")
 
-        args: List[str] = [gradle_executable, name] + args + ["--quiet"]
+        args: List[str] = [gradle_executable, name] + args + ["--quiet"]# + ["--max-workers=1"]
         # Run the Gradle task
         result = subprocess.run(
             args,
             cwd=gradle_path,
             capture_output=True,
             text=True,
-            timeout=150
+            timeout=3600
         )
 
         print(f"{timestamp()} Finished gradle {name}.")
